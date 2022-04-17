@@ -64,6 +64,7 @@ class Main extends Module {
   ))
 
   val tilemap = Module(new TilemapProcessor)
+  tilemap.io.format := Config.GFX_FORMAT_8BPP.U
   tilemap.io.video <> videoTiming.io.video
   tilemap.io.tileRom <> rom.io
 

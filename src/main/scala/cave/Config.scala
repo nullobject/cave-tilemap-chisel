@@ -45,6 +45,11 @@ object Config {
   val TILE_ROM_ADDR_WIDTH = 14
   val TILE_ROM_DATA_WIDTH = 64
 
+  /** 4BPP graphics format */
+  val GFX_FORMAT_4BPP = 1
+  /** 8BPP graphics format */
+  val GFX_FORMAT_8BPP = 2
+
   val videoTimingConfig = VideoTimingConfig(
     clockFreq = 28000000,
     clockDiv = 4,

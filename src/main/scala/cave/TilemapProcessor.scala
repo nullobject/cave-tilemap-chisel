@@ -46,12 +46,22 @@ import chisel3.util._
 
 class TilemapProcessor extends Module {
   val io = IO(new Bundle {
+    /** The tilemap graphics format. */
+    val format = Input(UInt(2.W))
+    /** Video timing signals. */
     val video = Input(new VideoIO)
-    /** Tile ROM */
+    /** Tile ROM read signals. */
     val tileRom = ReadMemIO(Config.TILE_ROM_ADDR_WIDTH, Config.TILE_ROM_DATA_WIDTH)
-    /** RGB output */
+    /** RGB output signal. */
     val rgb = Output(new RGB(Config.BITS_PER_CHANNEL))
   })
+
+  /** Decodes a row of pixels. */
+  def decode(data: Bits): Vec[Bits] = Mux(
+    io.format === Config.GFX_FORMAT_8BPP.U,
+    VecInit(TilemapProcessor.decode8BPP(data)),
+    VecInit(TilemapProcessor.decode4BPP(data))
+  )
 
   val pos = io.video.pos
 
@@ -72,7 +82,7 @@ class TilemapProcessor extends Module {
 
   val tileCodeReg = RegEnable(row ## (col + 1.U), latchTile)
   val tileRomAddr = tileCodeReg ## offset.y(2, 0)
-  val pixels = RegEnable(VecInit(TilemapProcessor.decode8BPP(io.tileRom.dout)), latchPixels)
+  val pixels = RegEnable(decode(io.tileRom.dout), latchPixels)
 
   // Outputs
   io.tileRom.rd := true.B
