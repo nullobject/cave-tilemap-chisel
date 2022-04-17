@@ -35,62 +35,40 @@
  *  SOFTWARE.
  */
 
-package video
+package axon.mem
 
-import axon.gfx._
-import axon.mem._
-import axon.types._
 import chisel3._
-import chisel3.stage.{ChiselGeneratorAnnotation, ChiselStage}
 
-/** This is the top-level module. */
-class Main extends Module {
-  val io = IO(new Bundle {
-    /** Video signals */
-    val video = VideoIO()
-    /** RGB output */
-    val rgb = Output(new RGB(4))
-  })
+/**
+ * This module wraps an external single-port ROM module.
+ *
+ * @param addrWidth The width of the address bus.
+ * @param dataWidth The width of the data bus.
+ */
+class SinglePortRom(addrWidth: Int, dataWidth: Int, depth: Int, initFile: String) extends Module {
+  val io = IO(Flipped(ReadMemIO(addrWidth, dataWidth)))
 
-  val config = VideoTimingConfig(
-    clockFreq = 28000000,
-    clockDiv = 4,
-    hFreq = 15625,
-    vFreq = 57.44,
-    hDisplay = 320,
-    vDisplay = 240,
-    hFrontPorch = 30,
-    vFrontPorch = 12,
-    hRetrace = 20,
-    vRetrace = 2,
-  )
-  val videoTiming = Module(new VideoTiming(config))
-  videoTiming.io.offset := SVec2(0.S, -1.S)
-  val video = videoTiming.io.video
+  class WrappedSinglePortRam extends BlackBox(
+    Map(
+      "ADDR_WIDTH" -> addrWidth,
+      "DATA_WIDTH" -> dataWidth,
+      "DEPTH" -> depth,
+      "INIT_FILE" -> initFile
+    )
+  ) {
+    val io = IO(new Bundle {
+      val clk = Input(Clock())
+      val rd = Input(Bool())
+      val addr = Input(UInt(addrWidth.W))
+      val dout = Output(Bits(dataWidth.W))
+    })
 
-  val rom = Module(new SinglePortRom(
-    addrWidth = 12,
-    dataWidth = 32,
-    depth = 4096,
-    initFile = "roms/tiles.mif"
-  ))
+    override def desiredName = "single_port_rom"
+  }
 
-  rom.io.default()
-
-  val rgb = RGB(
-    Mux(video.pos.x(2, 0) === 0.U | video.pos.y(2, 0) === 0.U, 15.U, 0.U),
-    Mux(video.pos.x(4), 15.U, 0.U),
-    Mux(video.pos.y(4), 15.U, 0.U),
-  )
-
-  // Outputs
-  io.video := video
-  io.rgb := Mux(video.enable, rgb, RGB(0.U(4.W)))
-}
-
-object Main extends App {
-  (new ChiselStage).execute(
-    Array("--compiler", "verilog", "--target-dir", "quartus/rtl", "--output-file", "Main"),
-    Seq(ChiselGeneratorAnnotation(() => new Main()))
-  )
+  val rom = Module(new WrappedSinglePortRam)
+  rom.io.clk := clock
+  rom.io.rd := io.rd
+  rom.io.addr := io.addr
+  io.dout := rom.io.dout
 }
