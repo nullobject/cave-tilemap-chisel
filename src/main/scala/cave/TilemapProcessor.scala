@@ -56,23 +56,23 @@ class TilemapProcessor extends Module {
   val pos = io.video.pos
 
   // Tilemap column and row
-  val col = pos.x(8, 4)
-  val row = pos.y(8, 4)
+  val col = pos.x(8, 3)
+  val row = pos.y(8, 3)
 
   // Pixel position within tile
   val offset = {
-    val x = pos.x(3, 0)
-    val y = pos.y(3, 0)
+    val x = pos.x(2, 0)
+    val y = pos.y(2, 0)
     UVec2(x, y)
   }
 
   // Control signals
-  val latchTile = offset.x === 14.U && io.video.pixelClockEnable
+  val latchTile = offset.x === 6.U && io.video.pixelClockEnable
   val latchPixels = offset.x(2, 0) === 7.U && io.video.pixelClockEnable
 
   val tileCodeReg = RegEnable(row ## (col + 1.U), latchTile)
-  val tileRomAddr = tileCodeReg ## offset.y(3) ## ~offset.x(3) ## offset.y(2, 0)
-  val pixels = RegEnable(VecInit(TilemapProcessor.decode4BPP(io.tileRom.dout)), latchPixels)
+  val tileRomAddr = tileCodeReg ## offset.y(2, 0)
+  val pixels = RegEnable(VecInit(TilemapProcessor.decode8BPP(io.tileRom.dout)), latchPixels)
 
   // Outputs
   io.tileRom.rd := true.B
@@ -93,4 +93,16 @@ object TilemapProcessor {
       // Pad nibbles into 8-bit pixels
       .map(_.pad(8)).toSeq
   }
+
+  /**
+   * Decodes 8x8x8 tiles (i.e. 64 bits per row)
+   *
+   * @param data The 64-bit tile ROM data.
+   */
+  def decode8BPP(data: Bits): Seq[Bits] =
+    Seq(2, 0, 3, 1, 6, 4, 7, 5, 10, 8, 11, 9, 14, 12, 15, 13)
+      // Decode data into nibbles
+      .reverseIterator.map(Util.decode(data, 16, 4).apply)
+      // Join high/low nibbles into 8-bit pixels
+      .grouped(2).map(Cat(_)).toSeq
 }
