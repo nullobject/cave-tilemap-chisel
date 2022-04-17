@@ -42,6 +42,7 @@ import axon.gfx._
 import axon.mem._
 import axon.types._
 import chisel3._
+import chisel3.util._
 
 class TilemapProcessor extends Module {
   val io = IO(new Bundle {
@@ -65,25 +66,18 @@ class TilemapProcessor extends Module {
     UVec2(x, y)
   }
 
-  val tileCodeReg = Reg(UInt(10.W))
-  val tileRomAddr = tileCodeReg ## offset.y(3) ## ~offset.x(3) ## offset.y(2, 0)
-  val romDataReg = Reg(UInt(Config.TILE_ROM_DATA_WIDTH.W))
-  val pixels = VecInit(TilemapProcessor.decode4BPP(romDataReg))
-
   // Control signals
-  val latchTile = offset.x === 13.U
-  val latchRow = offset.x(2, 0) === 7.U
+  val latchTile = offset.x === 14.U && io.video.pixelClockEnable
+  val latchPixels = offset.x(2, 0) === 7.U && io.video.pixelClockEnable
 
-  // Latch tile data
-  when(latchTile) { tileCodeReg := row ## (col + 1.U) }
-
-  // Latch row data
-  when(latchRow) { romDataReg := io.tileRom.dout }
+  val tileCodeReg = RegEnable(row ## (col + 1.U), latchTile)
+  val tileRomAddr = tileCodeReg ## offset.y(3) ## ~offset.x(3) ## offset.y(2, 0)
+  val pixels = RegEnable(VecInit(TilemapProcessor.decode4BPP(io.tileRom.dout)), latchPixels)
 
   // Outputs
   io.tileRom.rd := true.B
   io.tileRom.addr := tileRomAddr
-  io.rgb := RegNext(RGB(pixels(pos.x(2, 0) + 1.U)))
+  io.rgb := RGB(pixels(pos.x(2, 0)))
 }
 
 object TilemapProcessor {

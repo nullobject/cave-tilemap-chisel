@@ -87,6 +87,6 @@ begin
 
   video_csync <= not (hsync xor vsync);
   video_r <= r & r(3 downto 2);
-  video_g <= g & r(3 downto 2);
-  video_b <= b & r(3 downto 2);
+  video_g <= g & g(3 downto 2);
+  video_b <= b & b(3 downto 2);
 end arch;
