@@ -49,7 +49,7 @@ class Main extends Module {
     /** Video signals */
     val video = VideoIO()
     /** RGB output */
-    val rgb = Output(new RGB(4))
+    val rgb = Output(new RGB(Config.BITS_PER_CHANNEL))
   })
 
   val config = VideoTimingConfig(
@@ -65,24 +65,22 @@ class Main extends Module {
     vRetrace = 2,
   )
   val videoTiming = Module(new VideoTiming(config))
-  videoTiming.io.offset := SVec2(0.S, -1.S)
+  videoTiming.io.offset := SVec2(0.S, 0.S)
   videoTiming.io.video <> io.video
 
   val rom = Module(new SinglePortRom(
-    addrWidth = 12,
+    addrWidth = Config.TILE_ROM_ADDR_WIDTH,
     dataWidth = 32,
-    depth = 4096,
+    depth = 16384,
     initFile = "roms/tiles.mif"
   ))
 
-  rom.io.default()
-
   val tilemap = Module(new TilemapProcessor)
   tilemap.io.video <> videoTiming.io.video
-  tilemap.io.rom <> rom.io
+  tilemap.io.tileRom <> rom.io
 
   // Outputs
-  io.rgb := Mux(videoTiming.io.video.enable, tilemap.io.rgb, RGB(0.U(4.W)))
+  io.rgb := Mux(videoTiming.io.video.enable, tilemap.io.rgb, RGB(0.U(Config.BITS_PER_CHANNEL.W)))
 }
 
 object Main extends App {

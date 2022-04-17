@@ -37,56 +37,7 @@
 
 package cave
 
-import axon.Util
-import axon.gfx._
-import axon.mem._
-import axon.types._
-import chisel3._
-
-class TilemapProcessor extends Module {
-  val io = IO(new Bundle {
-    val video = Input(new VideoIO)
-    /** Tile ROM */
-    val tileRom = ReadMemIO(Config.TILE_ROM_ADDR_WIDTH, 32)
-    /** RGB output */
-    val rgb = Output(new RGB(Config.BITS_PER_CHANNEL))
-  })
-
-  val pos = io.video.pos
-
-  // Tilemap column and row
-  val col = pos.x(8, 4)
-  val row = pos.y(8, 4)
-
-  // Pixel position within tile
-  val offset = {
-    val x = pos.x(3, 0)
-    val y = pos.y(3, 0)
-    UVec2(x, y)
-  }
-
-  val tileCode = row ## col
-  val romAddrReg = RegNext(tileCode ## offset.y(3) ## offset.x(3) ## offset.y(2, 0))
-  val romDataReg = RegNext(io.tileRom.dout)
-  val pixels = VecInit(TilemapProcessor.decode4BPP(romDataReg))
-
-  // Outputs
-  io.tileRom.rd := true.B
-  io.tileRom.addr := romAddrReg
-  io.rgb := RGB(pixels(pos.x(2, 0)).asUInt)
-}
-
-object TilemapProcessor {
-  /**
-   * Decodes 8x8x4 tiles (i.e. 32 bits per row)
-   *
-   * @param data The 32-bit tile ROM data.
-   */
-  def decode4BPP(data: Bits): Seq[Bits] = {
-    Seq(0, 1, 2, 3, 4, 5, 6, 7)
-      // Decode data into nibbles
-      .reverseIterator.map(Util.decode(data, 8, 4).apply)
-      // Pad nibbles into 8-bit pixels
-      .map(_.pad(8)).toSeq
-  }
+object Config {
+  val BITS_PER_CHANNEL = 4
+  val TILE_ROM_ADDR_WIDTH = 14
 }
