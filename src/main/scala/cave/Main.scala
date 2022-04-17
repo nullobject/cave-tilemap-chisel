@@ -53,7 +53,7 @@ class Main extends Module {
   })
 
   val videoTiming = Module(new VideoTiming(Config.videoTimingConfig))
-  videoTiming.io.offset := SVec2(0.S, 0.S)
+  videoTiming.io.offset := SVec2.zero
   videoTiming.io.video <> io.video
 
   val rom = Module(new SinglePortRom(

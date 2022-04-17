@@ -92,5 +92,5 @@ object SVec2 {
    *
    * @param width The data width.
    */
-  def zero(width: Int) = SVec2(0.U(width.W), 0.U(width.W))
+  def zero = SVec2(0.S, 0.S)
 }
