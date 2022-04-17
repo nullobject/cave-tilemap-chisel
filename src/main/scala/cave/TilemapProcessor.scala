@@ -14,7 +14,7 @@
  *  https://twitter.com/nullobject
  *  https://github.com/nullobject
  *
- *  Copyright (c) 2020 Josh Bassett
+ *  Copyright (c) 2022 Josh Bassett
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -37,57 +37,25 @@
 
 package cave
 
-import axon.gfx._
+import axon.gfx.VideoIO
 import axon.mem._
 import axon.types._
 import chisel3._
-import chisel3.stage.{ChiselGeneratorAnnotation, ChiselStage}
 
-/** This is the top-level module. */
-class Main extends Module {
+class TilemapProcessor extends Module {
   val io = IO(new Bundle {
-    /** Video signals */
-    val video = VideoIO()
+    val video = Input(new VideoIO)
+    /** Tile ROM */
+    val rom = ReadMemIO(12, 32)
     /** RGB output */
     val rgb = Output(new RGB(4))
   })
 
-  val config = VideoTimingConfig(
-    clockFreq = 28000000,
-    clockDiv = 4,
-    hFreq = 15625,
-    vFreq = 57.44,
-    hDisplay = 320,
-    vDisplay = 240,
-    hFrontPorch = 30,
-    vFrontPorch = 12,
-    hRetrace = 20,
-    vRetrace = 2,
-  )
-  val videoTiming = Module(new VideoTiming(config))
-  videoTiming.io.offset := SVec2(0.S, -1.S)
-  videoTiming.io.video <> io.video
+  io.rom.default()
 
-  val rom = Module(new SinglePortRom(
-    addrWidth = 12,
-    dataWidth = 32,
-    depth = 4096,
-    initFile = "roms/tiles.mif"
-  ))
-
-  rom.io.default()
-
-  val tilemap = Module(new TilemapProcessor)
-  tilemap.io.video <> videoTiming.io.video
-  tilemap.io.rom <> rom.io
-
-  // Outputs
-  io.rgb := Mux(videoTiming.io.video.enable, tilemap.io.rgb, RGB(0.U(4.W)))
-}
-
-object Main extends App {
-  (new ChiselStage).execute(
-    Array("--compiler", "verilog", "--target-dir", "quartus/rtl", "--output-file", "Main"),
-    Seq(ChiselGeneratorAnnotation(() => new Main()))
+  io.rgb := RGB(
+    Mux(io.video.pos.x(2, 0) === 0.U | io.video.pos.y(2, 0) === 0.U, 15.U, 0.U),
+    Mux(io.video.pos.x(4), 15.U, 0.U),
+    Mux(io.video.pos.y(4), 15.U, 0.U),
   )
 }
