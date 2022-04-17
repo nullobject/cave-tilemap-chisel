@@ -43,7 +43,7 @@ object Config {
   val BITS_PER_CHANNEL = 4
 
   val TILE_ROM_ADDR_WIDTH = 14
-  val TILE_ROM_DATA_WIDTH = 32
+  val TILE_ROM_DATA_WIDTH = 64
 
   val videoTimingConfig = VideoTimingConfig(
     clockFreq = 28000000,
