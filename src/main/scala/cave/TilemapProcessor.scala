@@ -76,17 +76,19 @@ class TilemapProcessor extends Module {
   val latchPixels = io.video.pixelClockEnable && offset.x(2, 0) === 7.U
 
   // Tile format signals
+  val tileFormat_8x8x4 = !io.tileSize && io.tileFormat === Config.GFX_FORMAT_4BPP.U
   val tileFormat_8x8x8 = !io.tileSize && io.tileFormat === Config.GFX_FORMAT_8BPP.U
   val tileFormat_16x16x4 = io.tileSize && io.tileFormat === Config.GFX_FORMAT_4BPP.U
   val tileFormat_16x16x8 = io.tileSize && io.tileFormat === Config.GFX_FORMAT_8BPP.U
 
   val tileCodeReg = RegEnable(row ## (col + 1.U), latchTile)
   val tileRomAddr = MuxCase(0.U, Seq(
+    tileFormat_8x8x4 -> tileCodeReg ## offset.y(2, 1),
     tileFormat_8x8x8 -> tileCodeReg ## offset.y(2, 0),
-    tileFormat_16x16x4 -> tileCodeReg ## offset.y(3) ## ~offset.x(3) ## offset.y(2, 0),
+    tileFormat_16x16x4 -> tileCodeReg ## offset.y(3) ## ~offset.x(3) ## offset.y(2, 1),
     tileFormat_16x16x8 -> tileCodeReg ## offset.y(3) ## ~offset.x(3) ## offset.y(2, 0)
   ))
-  val pixels = RegEnable(TilemapProcessor.decode(io.tileFormat, io.tileRom.dout), latchPixels)
+  val pixels = RegEnable(TilemapProcessor.decode(io.tileFormat, offset.y(0), io.tileRom.dout), latchPixels)
 
   // Outputs
   io.tileRom.rd := true.B
@@ -101,10 +103,10 @@ object TilemapProcessor {
    * @param format The graphics format.
    * @param data   The tile ROM data.
    */
-  def decode(format: UInt, data: Bits): Vec[Bits] = Mux(
+  def decode(format: UInt, toggle: Bool, data: Bits): Vec[Bits] = Mux(
     format === Config.GFX_FORMAT_8BPP.U,
     VecInit(TilemapProcessor.decode8BPP(data)),
-    VecInit(TilemapProcessor.decode4BPP(data))
+    VecInit(TilemapProcessor.decode4BPP(toggle, data))
   )
 
   /**
@@ -112,10 +114,11 @@ object TilemapProcessor {
    *
    * @param data The 32-bit tile ROM data.
    */
-  private def decode4BPP(data: Bits): Seq[Bits] = {
+  private def decode4BPP(toggle: Bool, data: Bits): Seq[Bits] = {
+    val bits = Mux(toggle, data.tail(Config.TILE_ROM_DATA_WIDTH / 2), data.head(Config.TILE_ROM_DATA_WIDTH / 2))
     Seq(0, 1, 2, 3, 4, 5, 6, 7)
       // Decode data into nibbles
-      .reverseIterator.map(Util.decode(data, 8, 4).apply)
+      .reverseIterator.map(Util.decode(bits, 8, 4).apply)
       // Pad nibbles into 8-bit pixels
       .map(_.pad(8)).toSeq
   }
