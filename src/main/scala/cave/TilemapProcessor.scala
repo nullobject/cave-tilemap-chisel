@@ -58,13 +58,45 @@ class TilemapProcessor extends Module {
     val rgb = Output(new RGB(Config.BITS_PER_CHANNEL))
   })
 
+  /**
+   * Calculates the tile ROM address.
+   *
+   * @param code   The tile code.
+   * @param offset The pixel offset.
+   */
+  def calculateTileRomAddr(code: UInt, offset: UVec2): UInt = {
+    val tileFormat_8x8x4 = !io.tileSize && io.tileFormat === Config.GFX_FORMAT_4BPP.U
+    val tileFormat_8x8x8 = !io.tileSize && io.tileFormat === Config.GFX_FORMAT_8BPP.U
+    val tileFormat_16x16x4 = io.tileSize && io.tileFormat === Config.GFX_FORMAT_4BPP.U
+    val tileFormat_16x16x8 = io.tileSize && io.tileFormat === Config.GFX_FORMAT_8BPP.U
+
+    MuxCase(0.U, Seq(
+      tileFormat_8x8x4 -> code ## offset.y(2, 1),
+      tileFormat_8x8x8 -> code ## offset.y(2, 0),
+      tileFormat_16x16x4 -> code ## offset.y(3) ## ~offset.x(3) ## offset.y(2, 1),
+      tileFormat_16x16x8 -> code ## offset.y(3) ## ~offset.x(3) ## offset.y(2, 0)
+    ))
+  }
+
+  /**
+   * Decodes a row of pixels from the given 64-bit tile ROM data.
+   *
+   * @param data   The tile ROM data.
+   * @param offset The pixel offset.
+   */
+  def decodePixels(data: Bits, offset: UVec2): Vec[Bits] = Mux(
+    io.tileFormat === Config.GFX_FORMAT_8BPP.U,
+    VecInit(TilemapProcessor.decode8BPP(data)),
+    VecInit(TilemapProcessor.decode4BPP(data, offset.y(0)))
+  )
+
   val pos = io.video.pos
 
   // Tilemap column and row
   val col = Mux(io.tileSize, pos.x(8, 4), pos.x(8, 3))
   val row = Mux(io.tileSize, pos.y(8, 4), pos.y(8, 3))
 
-  // Pixel position within tile
+  // Pixel offset within a tile
   val offset = {
     val x = Mux(io.tileSize, pos.x(3, 0), pos.x(2, 0))
     val y = Mux(io.tileSize, pos.y(3, 0), pos.y(2, 0))
@@ -75,20 +107,10 @@ class TilemapProcessor extends Module {
   val latchTile = io.video.pixelClockEnable && Mux(io.tileSize, offset.x === 14.U, offset.x === 6.U)
   val latchPixels = io.video.pixelClockEnable && offset.x(2, 0) === 7.U
 
-  // Tile format signals
-  val tileFormat_8x8x4 = !io.tileSize && io.tileFormat === Config.GFX_FORMAT_4BPP.U
-  val tileFormat_8x8x8 = !io.tileSize && io.tileFormat === Config.GFX_FORMAT_8BPP.U
-  val tileFormat_16x16x4 = io.tileSize && io.tileFormat === Config.GFX_FORMAT_4BPP.U
-  val tileFormat_16x16x8 = io.tileSize && io.tileFormat === Config.GFX_FORMAT_8BPP.U
-
-  val tileCodeReg = RegEnable(row ## (col + 1.U), latchTile)
-  val tileRomAddr = MuxCase(0.U, Seq(
-    tileFormat_8x8x4 -> tileCodeReg ## offset.y(2, 1),
-    tileFormat_8x8x8 -> tileCodeReg ## offset.y(2, 0),
-    tileFormat_16x16x4 -> tileCodeReg ## offset.y(3) ## ~offset.x(3) ## offset.y(2, 1),
-    tileFormat_16x16x8 -> tileCodeReg ## offset.y(3) ## ~offset.x(3) ## offset.y(2, 0)
-  ))
-  val pixels = RegEnable(TilemapProcessor.decode(io.tileFormat, offset.y(0), io.tileRom.dout), latchPixels)
+  val tileCode = Mux(io.tileSize, row ## (col(4, 0) + 1.U), row ## (col(5, 0) + 1.U))
+  val tileCodeReg = RegEnable(tileCode, latchTile)
+  val tileRomAddr = calculateTileRomAddr(tileCodeReg, offset)
+  val pixels = RegEnable(decodePixels(io.tileRom.dout, offset), latchPixels)
 
   // Outputs
   io.tileRom.rd := true.B
@@ -98,24 +120,14 @@ class TilemapProcessor extends Module {
 
 object TilemapProcessor {
   /**
-   * Decodes a row of pixels.
+   * Decodes a row of pixel from a 8x8x4 tile (i.e. 32 bits per row)
    *
-   * @param format The graphics format.
-   * @param data   The tile ROM data.
+   * @param data   The 64-bit tile ROM data.
+   * @param nibble A flag that indicates whether to decode the lower or upper 32-bits of the tile
+   *               ROM data.
    */
-  def decode(format: UInt, toggle: Bool, data: Bits): Vec[Bits] = Mux(
-    format === Config.GFX_FORMAT_8BPP.U,
-    VecInit(TilemapProcessor.decode8BPP(data)),
-    VecInit(TilemapProcessor.decode4BPP(toggle, data))
-  )
-
-  /**
-   * Decodes 8x8x4 tiles (i.e. 32 bits per row)
-   *
-   * @param data The 32-bit tile ROM data.
-   */
-  private def decode4BPP(toggle: Bool, data: Bits): Seq[Bits] = {
-    val bits = Mux(toggle, data.tail(Config.TILE_ROM_DATA_WIDTH / 2), data.head(Config.TILE_ROM_DATA_WIDTH / 2))
+  private def decode4BPP(data: Bits, nibble: Bool): Seq[Bits] = {
+    val bits = Mux(nibble, data.tail(Config.TILE_ROM_DATA_WIDTH / 2), data.head(Config.TILE_ROM_DATA_WIDTH / 2))
     Seq(0, 1, 2, 3, 4, 5, 6, 7)
       // Decode data into nibbles
       .reverseIterator.map(Util.decode(bits, 8, 4).apply)
@@ -124,7 +136,7 @@ object TilemapProcessor {
   }
 
   /**
-   * Decodes 8x8x8 tiles (i.e. 64 bits per row)
+   * Decodes a row of pixel from a 8x8x8 tile (i.e. 64 bits per row)
    *
    * @param data The 64-bit tile ROM data.
    */

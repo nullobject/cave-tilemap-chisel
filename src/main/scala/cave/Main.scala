@@ -60,12 +60,12 @@ class Main extends Module {
     addrWidth = Config.TILE_ROM_ADDR_WIDTH,
     dataWidth = Config.TILE_ROM_DATA_WIDTH,
     depth = 16384,
-    initFile = "roms/tiles.mif"
+    initFile = "roms/layer2.mif"
   ))
 
   val tilemap = Module(new TilemapProcessor)
   tilemap.io.tileSize := true.B
-  tilemap.io.tileFormat := Config.GFX_FORMAT_4BPP.U
+  tilemap.io.tileFormat := Config.GFX_FORMAT_8BPP.U
   tilemap.io.video <> videoTiming.io.video
   tilemap.io.tileRom <> rom.io
 
