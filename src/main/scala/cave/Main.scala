@@ -35,7 +35,7 @@
  *  SOFTWARE.
  */
 
-package video
+package cave
 
 import axon.gfx._
 import axon.mem._
