@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <bytecodeTargetLevel>
+      <module name="cave-chisel" target="1.8" />
+      <module name="tecmo-chisel" target="1.8" />
+      <module name="video-chisel" target="1.8" />
+      <module name="z80-chisel" target="1.8" />
+    </bytecodeTargetLevel>
+  </component>
+</project>
