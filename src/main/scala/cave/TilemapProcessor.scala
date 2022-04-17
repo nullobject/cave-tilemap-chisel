@@ -47,7 +47,7 @@ class TilemapProcessor extends Module {
   val io = IO(new Bundle {
     val video = Input(new VideoIO)
     /** Tile ROM */
-    val tileRom = ReadMemIO(Config.TILE_ROM_ADDR_WIDTH, 32)
+    val tileRom = ReadMemIO(Config.TILE_ROM_ADDR_WIDTH, Config.TILE_ROM_DATA_WIDTH)
     /** RGB output */
     val rgb = Output(new RGB(Config.BITS_PER_CHANNEL))
   })
@@ -65,15 +65,25 @@ class TilemapProcessor extends Module {
     UVec2(x, y)
   }
 
-  val tileCode = row ## col
-  val romAddrReg = RegNext(tileCode ## offset.y(3) ## offset.x(3) ## offset.y(2, 0))
-  val romDataReg = RegNext(io.tileRom.dout)
+  val tileCodeReg = Reg(UInt(10.W))
+  val tileRomAddr = tileCodeReg ## offset.y(3) ## ~offset.x(3) ## offset.y(2, 0)
+  val romDataReg = Reg(UInt(Config.TILE_ROM_DATA_WIDTH.W))
   val pixels = VecInit(TilemapProcessor.decode4BPP(romDataReg))
+
+  // Control signals
+  val latchTile = offset.x === 13.U
+  val latchRow = offset.x(2, 0) === 7.U
+
+  // Latch tile data
+  when(latchTile) { tileCodeReg := row ## (col + 1.U) }
+
+  // Latch row data
+  when(latchRow) { romDataReg := io.tileRom.dout }
 
   // Outputs
   io.tileRom.rd := true.B
-  io.tileRom.addr := romAddrReg
-  io.rgb := RGB(pixels(pos.x(2, 0)).asUInt)
+  io.tileRom.addr := tileRomAddr
+  io.rgb := RegNext(RGB(pixels(pos.x(2, 0) + 1.U)))
 }
 
 object TilemapProcessor {

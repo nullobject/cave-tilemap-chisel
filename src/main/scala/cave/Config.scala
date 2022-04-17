@@ -37,7 +37,24 @@
 
 package cave
 
+import axon.gfx.VideoTimingConfig
+
 object Config {
   val BITS_PER_CHANNEL = 4
+
   val TILE_ROM_ADDR_WIDTH = 14
+  val TILE_ROM_DATA_WIDTH = 32
+
+  val videoTimingConfig = VideoTimingConfig(
+    clockFreq = 28000000,
+    clockDiv = 4,
+    hFreq = 15625,
+    vFreq = 57.44,
+    hDisplay = 320,
+    vDisplay = 240,
+    hFrontPorch = 36,
+    vFrontPorch = 12,
+    hRetrace = 20,
+    vRetrace = 2
+  )
 }

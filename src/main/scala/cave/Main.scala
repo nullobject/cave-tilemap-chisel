@@ -52,25 +52,13 @@ class Main extends Module {
     val rgb = Output(new RGB(Config.BITS_PER_CHANNEL))
   })
 
-  val config = VideoTimingConfig(
-    clockFreq = 28000000,
-    clockDiv = 4,
-    hFreq = 15625,
-    vFreq = 57.44,
-    hDisplay = 320,
-    vDisplay = 240,
-    hFrontPorch = 30,
-    vFrontPorch = 12,
-    hRetrace = 20,
-    vRetrace = 2,
-  )
-  val videoTiming = Module(new VideoTiming(config))
+  val videoTiming = Module(new VideoTiming(Config.videoTimingConfig))
   videoTiming.io.offset := SVec2(0.S, 0.S)
   videoTiming.io.video <> io.video
 
   val rom = Module(new SinglePortRom(
     addrWidth = Config.TILE_ROM_ADDR_WIDTH,
-    dataWidth = 32,
+    dataWidth = Config.TILE_ROM_DATA_WIDTH,
     depth = 16384,
     initFile = "roms/tiles.mif"
   ))
